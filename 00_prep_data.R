@@ -1,5 +1,7 @@
 # Clear the R environment of all objects to start fresh
 rm(list=ls())
+# set a seed for reprodicibility of the random sampling
+set.seed(3625)
 # Load tidyverse for data manipulation (dplyr, ggplot2, etc.)
 library(tidyverse)
 # Load sf for handling and visualizing spatial data
