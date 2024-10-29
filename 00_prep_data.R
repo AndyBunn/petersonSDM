@@ -1,23 +1,31 @@
+# Clear the R environment of all objects to start fresh
 rm(list=ls())
-library(tidyverse) # using tidy syntax
-library(sf)        # for handling spatial data
-library(terra)     # for working with raster (aka grid data)
-library(tidyterra) # for working with raster in tidy way
-library(tmap)      # for fancy maps
-library(geodata)   # for climate data
-library(predicts)  # for getting training/testing folds
+# Load tidyverse for data manipulation (dplyr, ggplot2, etc.)
+library(tidyverse)
+# Load sf for handling and visualizing spatial data
+library(sf)
+# Load terra for working with raster (grid) data
+library(terra)
+# Load tidyterra to combine raster data processing with tidyverse workflows
+library(tidyterra)
+# Load tmap for creating thematic maps, supports both static and interactive maps
+library(tmap)
+# Load geodata to access global climate and geographical datasets
+library(geodata)
 
+# Load presence data (species observation) from CSV file
 presence <- read_csv("Chariclea_Final_Thin.csv")
-# make presence into a class sf object (spatially explicit) with a
-# lat, long refernce system
+
+# Convert 'presence' data to an sf object with spatial coordinates (longitude, latitude)
 presenceSF <- st_as_sf(presence, coords = c("Longitude","Latitude"), crs = 4326)
 
-# let's make a quick map
+# Set tmap to interactive mode ('view') for creating a quick interactive map
 tmap_mode("view")
+# Define the shape layer (presenceSF) for tmap and plot points as symbols on the map
 tm_shape(presenceSF) +
   tm_symbols()
 
-# now, let's get the climate data
+# Fetch and prepare climate data to overlay with species presence data
 # we will make a data directory called "climateData" if it doesn't exist.
 # note that this happens at the root level of the project.
 data_path <- "./spatialData"
@@ -27,19 +35,23 @@ if (!dir.exists(data_path)) {
 } else {
   message("Directory already exists at: ", data_path)
 }
-# now we get the bioClim variables from world clim. Note that this
-# is a big ask the first time you do it. After it's downloaded we will
-# clip it to spare the computer some work. This is a ~600MB call for the
+
+# Now we get the bioClim variables from world clim. Note that this
+# is a big(ish) ask the first time you do it (600MB).
+# But after the data are initially
+# downloaded they live on your machine and don't need to be dowloaded again
+# provided you are in the same project
+# After it's downloaded we will clip it to to a more reasobale area
 #
 # more info on variables here:
 # https://www.worldclim.org/data/bioclim.html
 bioClim <- worldclim_global(var = "bio",
-                                 res = 2.5,
-                                 path = data_path)
-# note the class (SpatRaster) adn that this is a 19 layer cube
+                            res = 2.5,
+                            path = data_path)
+# note the class (SpatRaster) and that this is a 19 layer cube
 bioClim
 
-# Add better names
+# Here are the layer names
 # BIO1 = Annual Mean Temperature
 # BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))
 # BIO3 = Isothermality (BIO2/BIO7) (×100)
@@ -61,18 +73,20 @@ bioClim
 # BIO19 = Precipitation of Coldest Quarter
 
 bioClimNames <- c("AnnualMeanTmp", "MeanDiurnalRange", "Isothermality", "TmpSeasonality",
-"MaxTmpPrcpWarmestMonth", "MinTmpPrcpColdestMonth", "TmpAnnualRange",
-"MeanTmpPrcpWettestQtr", "MeanTmpPrcpDriestQtr", "MeanTmpPrcpWarmestQtr",
-"MeanTmpPrcpColdestQtr", "AnnualPrcp","PrcpPrcpWettestMonth",
-"PrcpPrcpDriestMonth", "PrcpSeasonality", "PrcpPrcpWettestQtr",
-"PrcpPrcpDriestQtr", "PrcpPrcpWarmestQtr", "PrcpPrcpColdestQtr")
+                  "MaxTmpPrcpWarmestMonth", "MinTmpPrcpColdestMonth", "TmpAnnualRange",
+                  "MeanTmpPrcpWettestQtr", "MeanTmpPrcpDriestQtr", "MeanTmpPrcpWarmestQtr",
+                  "MeanTmpPrcpColdestQtr", "AnnualPrcp","PrcpPrcpWettestMonth",
+                  "PrcpPrcpDriestMonth", "PrcpSeasonality", "PrcpPrcpWettestQtr",
+                  "PrcpPrcpDriestQtr", "PrcpPrcpWarmestQtr", "PrcpPrcpColdestQtr")
 
+# add names to bioClim
 names(bioClim) <- bioClimNames
-# let's grab the elev data too. We will use it as a predictor and to
+
+# Let's grab the elev data too. We will use it as a predictor and to
 # constrain the psuedo absence point generation. We don't want ridiculous
 # absence points in the lowlands
 elev <- elevation_global(res = 2.5,
-                              path = data_path)
+                         path = data_path)
 names(elev) <- "elev"
 
 # Now we get the future climate data from cmip6.
@@ -80,25 +94,26 @@ names(elev) <- "elev"
 # there are a zillion models, four scenarios, and time to
 # consider.
 cmip6 <- cmip6_world(model = "HadGEM3-GC31-LL",
-                          ssp = "245",
-                          time = "2061-2080",
-                          var = "bioc",
-                          res = 2.5,
-                          path = data_path)
+                     ssp = "245",
+                     time = "2061-2080",
+                     var = "bioc",
+                     res = 2.5,
+                     path = data_path)
 # add in the names
 names(cmip6) <- bioClimNames
 
 # We don't want to model the entire world, right?
 # Let's get the extent of the data and expand it by 5 degrees for clipping
-# the climate data to something
-# reasonable. Note that 5 deg might or might not be a good number
+# the climate data to something reasonable.
+# Note that 5 deg might or might not be a good number
 presenceSF_bbox <- st_bbox(presenceSF)
 presenceSF_bbox_expanded <- presenceSF_bbox
 presenceSF_bbox_expanded[1] <- presenceSF_bbox_expanded[1] - 5
 presenceSF_bbox_expanded[2] <- presenceSF_bbox_expanded[2] - 5
 presenceSF_bbox_expanded[3] <- presenceSF_bbox_expanded[3] + 5
 presenceSF_bbox_expanded[4] <- presenceSF_bbox_expanded[4] + 5
-# make into class sf
+
+# Convert 'presence' data to an sf object with spatial coordinates (longitude, latitude)
 presenceSF_bbox_expandedSF <- st_as_sfc(presenceSF_bbox_expanded)
 
 # take a look -- static map this time
@@ -111,8 +126,7 @@ bioClim <- crop(x = bioClim, y = presenceSF_bbox_expandedSF)
 elev <- crop(x = elev, y = presenceSF_bbox_expandedSF)
 cmip6 <- crop(x = cmip6, y = presenceSF_bbox_expandedSF)
 
-
-# note the dimensions now
+# note the dimensions now -- much smaller
 bioClim
 
 # and take a look -- use elevation as base
@@ -136,9 +150,9 @@ dim(predictorsFuture)
 # pseudo absence data. Let's do this in a way that constrains the points to
 # be 1. high elevation and 2. not on top of existing presence data
 
-# Let's get a minumuum elevation
+# Let's get a minimum elevation
 presenceSF$elev <- extract(elev,presenceSF)$elev
-# constrain to >5% to avoid funnies in the data
+# constrain to >5% of obecserved elevations to avoid funnies in the data
 minElev <- quantile(presenceSF$elev, probs = 0.05)
 minElev # about 1000m here
 
@@ -181,3 +195,6 @@ presAbsSF # look at all those lovely predictors
 presAbsDF <- st_drop_geometry(presAbsSF)
 
 # we are now ready to move on to model development.
+save(object = presAbsSF, presAbsDF,
+     predictorsModern, predictorsFuture,
+     file = "data4model.Rdata")
