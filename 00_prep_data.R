@@ -197,6 +197,8 @@ presAbsSF # look at all those lovely predictors
 presAbsDF <- st_drop_geometry(presAbsSF)
 
 # we are now ready to move on to model development.
-save(object = presAbsSF, presAbsDF,
-     predictorsModern, predictorsFuture,
-     file = "data4model.Rdata")
+# let's save what I think we'll need
+saveRDS(object = presAbsSF, file = "presAbsSF.rds")
+saveRDS(object = presAbsDF,, file = "presAbsDF.rds")
+saveRDS(object = predictorsModern, file = "predictorsModern.rds")
+saveRDS(object = predictorsFuture, file = "predictorsFuture.rds")
