@@ -161,7 +161,7 @@ names(transformed_aspect) <- "southness"
 # let's put all the topographic data together. I'll not going to include raw
 # aspect here because it's a dangerous predictor variable.
 # Use aspect_cat and/or transformed_aspect as predictors
-topo <- c(elev,slope,aspect,aspect_cat,transformed_aspect)
+topo <- c(elev,slope,aspect_cat,transformed_aspect)
 
 # Get landcover (it's native as 30 sec values). With `geodata` we can get pct
 # of "trees", "grassland", "shrubs", "cropland", "built", "bare", "snow",
@@ -247,20 +247,20 @@ pseudoAbsenceSF <- as_sf(pseudoAbsenceSF)
 
 # Combine the pseudoAbsenceSF data and presenceSF data to the make one sf
 # object coded as pres/abs by adding a new column
-presenceSF$present <- "present"
-pseudoAbsenceSF$present <- "absent"
+presenceSF$SpeciesStatus <- "present"
+pseudoAbsenceSF$SpeciesStatus <- "absent"
 # and combining -- note we will drop elevation from these data.frames
 # we used elev here to get the right threshold for generating the data
 # but we don't need it in the data frame now.
 presAbsSF <- rbind(presenceSF %>% select(-elev),
                    pseudoAbsenceSF %>% select(-elev))
-presAbsSF$present <- as.factor(presAbsSF$present)
+presAbsSF$SpeciesStatus <- as.factor(presAbsSF$SpeciesStatus)
 # note that we have the same number of present and absent values
-table(presAbsSF$present)
+table(presAbsSF$SpeciesStatus)
 
 # let's take a look
 tm_shape(presAbsSF) +
-  tm_symbols(col = "present",style="cat",alpha=0.5)
+  tm_symbols(col = "SpeciesStatus",style="cat",alpha=0.5)
 
 # now that we have somewhat realistic presence and absence data we can
 # extract the climate data from the and add it to presAbsSF
