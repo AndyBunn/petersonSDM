@@ -25,8 +25,6 @@
 ################################################################################
 # Clear the R environment of all objects to start fresh
 rm(list=ls())
-# set a seed for reprodicibility of the random sampling
-set.seed(3625)
 # Load tidyverse for data manipulation (dplyr, ggplot2, etc.)
 library(tidyverse)
 # Load sf for handling and visualizing spatial data
@@ -161,7 +159,10 @@ names(transformed_aspect) <- "southness"
 # let's put all the topographic data together. I'll not going to include raw
 # aspect here because it's a dangerous predictor variable.
 # Use aspect_cat and/or transformed_aspect as predictors
-topo <- c(elev,slope,aspect_cat,transformed_aspect)
+# Also, note that I'm not including elevation as a predictor. It's
+# mostly a proxy for temperature and we have that in the bioclim data
+topo <- c(slope,aspect_cat,transformed_aspect)
+names(topo) <- c("Slope","CategoricalAspect","TransformedAspect")
 
 # Get landcover (it's native as 30 sec values). With `geodata` we can get pct
 # of "trees", "grassland", "shrubs", "cropland", "built", "bare", "snow",
@@ -170,7 +171,7 @@ topo <- c(elev,slope,aspect_cat,transformed_aspect)
 # handy as well.
 pctTree <- landcover(var = "trees",
                      path = data_path)
-
+names(pctTree) <- "TreePct"
 # We don't want to model the entire world, right?
 # Let's get the extent of the data and expand it by 5 degrees for clipping
 # the climate data to something reasonable.
@@ -199,11 +200,11 @@ cmip6 <- crop(x = cmip6, y = presenceSF_bbox_expandedSF)
 # note the dimensions now -- much smaller
 bioClim
 
-# and take a look -- use elevation as base
+# and take a look
 ggplot() +
-  geom_spatraster(data=topo$elev) +
+  geom_spatraster(data=bioClim$AnnualMeanTmp) +
   geom_sf(data=presenceSF) +
-  scale_fill_hypso_c()
+  scale_fill_whitebox_c()
 
 # Let's add bioclim, topo, pctTree data together to make the
 # brick that we will use to build the model
@@ -239,7 +240,9 @@ presenceSF_cells <- extract(absenceMask, presenceSF, cells=T)$cell
 # and set cells in absenceMask to NA
 values(absenceMask)[presenceSF_cells] <- NA
 # Now make a sf object that is in the elev range and excludes places where
-# there are actual observations. Generate an equal number of pseudo absences
+# there are actual observations. Generate an equal number of pseudo absences.
+# set a seed for reproducibility of the random sampling
+set.seed(3625)
 pseudoAbsenceSF <- spatSample(absenceMask,size = nrow(presenceSF),
                               na.rm=TRUE, as.points=TRUE)
 # annoyingly, this is class spatVector -- make into sf
